@@ -53,6 +53,7 @@ function oauthTokenEndpoint(applicationHref)
   local body = ngx.req.get_body_data()
   local cbody = nil
 
+  ngx.print(body)
   -- Proxy these certain parameters to the Auth0 API
   -- Only support 'client_credentials' and 'password' flows
 
