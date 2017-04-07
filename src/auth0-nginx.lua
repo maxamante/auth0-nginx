@@ -1,24 +1,27 @@
+local cjson = require('cjson')
+local http = require('resty.http')
 local jwt = require('resty.jwt')
 local validators = require('resty.jwt-validators')
-local id = os.getenv('AUTH0_APIKEY_ID')
-local secret = os.getenv('AUTH0_APIKEY_SECRET')
-local appHref = os.getenv('AUTH0_CLIENT_HREF')
 
-assert(id ~= nil, 'Environment variable AUTH0_APIKEY_ID not set')
-assert(secret ~= nil, 'Environment variable AUTH0_APIKEY_SECRET not set')
+local appHref = os.getenv('AUTH0_ACCOUNT_DOMAIN')
+local clientId = os.getenv('AUTH0_CLIENT_ID')
+local clientSecret = os.getenv('AUTH0_CLIENT_SECRET')
+
+assert(clientId ~= nil, 'Environment variable AUTH0_CLIENT_ID not set')
+assert(clientSecret ~= nil, 'Environment variable AUTH0_CLIENT_SECRET not set')
 
 local M = {}
 local Helpers = {}
 
-function M.getAccount()
-  getAccount(false)
+function M.getAccount(secret, aud)
+  getAccount(false, secret, aud)
 end
 
-function M.requireAccount()
-  getAccount(true)
+function M.requireAccount(secret, aud)
+  getAccount(true, secret, aud)
 end
 
-function getAccount(required)
+function getAccount(required, secret, audience)
   local jwtString = Helpers.getBearerToken()
 
   if not jwtString then
@@ -27,18 +30,17 @@ function getAccount(required)
 
   local claimSpec = {
     exp = validators.required(validators.opt_is_not_expired()),
+    iss = validators.required(validators.opt_equals(appHref)),
+    aud = validators.required(validators.opt_equals(audience)),
   }
 
   local jwt = jwt:verify(secret, jwtString, claimSpec)
 
-  if not (jwt.verified and jwt.header.stt == 'access' and jwt.header.alg == 'HS256') then
+  if not (jwt.verified and jwt.header.alg == 'HS256') then
     return Helpers.exit(required)
   end
 end
 
-
-local http = require('resty.http')
-local cjson = require('cjson')
 
 function M.oauthTokenEndpoint(applicationHref)
   applicationHref = applicationHref or appHref
@@ -50,31 +52,18 @@ function oauthTokenEndpoint(applicationHref)
   ngx.req.read_body()
 
   local headers = ngx.req.get_headers()
-  local body = ngx.req.get_body_data()
-  local cbody = nil
+  local body = cjson.decode(ngx.req.get_body_data())
 
-  ngx.print(body)
-  -- Proxy these certain parameters to the Auth0 API
-  -- Only support 'client_credentials' and 'password' flows
+  -- Add clientId and clientSecret to non-client_credentials requests
 
-  -- Password flow
-  if body['grant_type'] == 'password' then
-      cbody = {
-          ['grant_type'] = body['grant_type'],
-          username = body['username'],
-          password = body['password'],
-          audience = 'null',
-          ['client_id'] = id,
-          ['client_secret'] = secret
-      }
-  else
-  -- Client Credentials flow
-      cbody = body
+  if body['grant_type'] ~= 'client_credentials' then
+      body['client_id'] = clientId
+      body['client_secret'] = clientSecret
   end
 
   local request = {
     method = ngx.var.request_method,
-    body = cbody,
+    body = cjson.encode(body),
     headers = {
       ['content-type'] = 'application/json',
       accept = 'application/json'
@@ -83,7 +72,7 @@ function oauthTokenEndpoint(applicationHref)
 
   -- Make the request
 
-  local res, err = httpc:request_uri(applicationHref .. '/oauth/token' , request)
+  local res, err = httpc:request_uri(applicationHref .. 'oauth/token' , request)
 
   if not res or res.status >= 500 then
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
