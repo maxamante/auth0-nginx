@@ -1,5 +1,5 @@
 package = 'auth0-nginx'
-version = '1.0.1'
+version = '1.0.1-0'
 source = {
   url = 'git://github.com/maxamante/auth0-nginx',
   tag = '1.0.1'
