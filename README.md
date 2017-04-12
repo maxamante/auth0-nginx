@@ -2,7 +2,7 @@
 
 This is an Auth0 integration written in Lua for the nginx web server.
 
-This integration allows you to use nginx as an API Gateway for your backend, without integrating Auth0 into every service.
+This integration allows you to use nginx as an API Gateway for your backend without integrating Auth0 into every service.
 
 # Why use an nginx plugin?
 
@@ -18,9 +18,9 @@ location /api/ {
 }
 ```
 
-When a user makes a request to `/api/*`, Auth0 will look for and validate an access token for the request. If no access token is found or an access token with mismatching signature key and/or audience is found, Auth0 will ask nginx to render a `401 Unauthorized` page.
+When a user makes a request to `/api/*`, Auth0 will look for and validate an access token for the request. If no access token is found or an access token with mismatching signature key and/or audience is found, Auth0 will ask nginx to render a `401 Unauthorized` page. For more information, please read through [this token verification documentation](https://auth0.com/docs/api-auth/tutorials/verify-access-token#check-the-signature-algorithm).
 
-The Auth0 nginx integration also exposes an OAuth 2.0 endpoint that can issue access and refresh tokens for authenticated users.
+The Auth0 nginx integration also exposes an OAuth 2.0 endpoint that can issue access and refresh tokens for authenticated users, as well as signup and change password endpoints.
 
 # Installation
 
@@ -49,41 +49,44 @@ The Auth0 plugin allows you to perform access control by adding code in the `acc
 
 ## Configuring the Auth0 API Key and Secret
 
-As with any other Auth0 integration, the Auth0 nginx plugin reads environment variables to find the API Key and Secret for Auth0. Sign into your Auth0 admin console to find your API Key and secret, and by running these and adding to your `.bash_profile`:
+As with any other Auth0 integration, the Auth0 nginx plugin reads environment variables to find the client key, secret, user database connection and domain for Auth0. Sign into your Auth0 admin console to find your client key, secret, user database connection and domain by running these and adding to your `.bash_profile`:
 
 ```
 export AUTH0_CLIENT_ID=
 export AUTH0_CLIENT_SECRET=
-export AUTH0_ACCOUNT_DOMAIN={Domain given to your account that most requests go through}
+export AUTH0_CLIENT_CONNECTION={Client's user database connection name}
+export AUTH0_ACCOUNT_DOMAIN={Account domain that most requests will go through}
 ```
 
 With nginx, you need to explicitly expose environment variables to modules in the configuration, so you need to add into the top level configuration:
 
-```
+```nginx
 env AUTH0_CLIENT_ID;
 env AUTH0_CLIENT_SECRET;
+env AUTH0_CLIENT_CONNECTION;
 env AUTH0_ACCOUNT_DOMAIN;
 ```
 
 You also need to declare and expose a pair of key/audience values per endpoint that nginx will be providing authentication. E.g. If you have a `service1` endpoint:
 
 ```
-export SERVICE1_SECRET={Signing secret found near the bottom of the API's Settings page}
 export SERVICE1_AUD={Identifier found near the top of the API's Settings page}
+export SERVICE1_SECRET={Signing secret found near the bottom of the API's Settings page}
 ```
 
-Again in the nginx.conf file:
+Again expose them in the top level configuration of your nginx.conf file:
 
-```
-env SERVICE1_SECRET;
+```nginx
 env SERVICE1_AUD;
+env SERVICE1_SECRET;
 ```
 
 Note: Instead of calling `getAccount` or `requireAccount` as shown above you can also declare nginx variables in a server and/or location level configuration and call it like:
 
-```
+```nginx
 server {
     ...
+
     set_by_lua $service1_secret 'return os.getenv("SERVICE1_SECRET")';
     set_by_lua $service1_aud 'return os.getenv("SERVICE1_AUD")';
 
@@ -94,7 +97,16 @@ server {
         }
         proxy_pass http://localhost:3000/;
     }
+
+    ...
 }
+```
+
+The `getAccount` and `requireAccount` methods require the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+
+```nginx
+auth0.getAccount(ngx.var.service1_secret, ngx.var.service1_aud, 'https://ACCOUNT_DOMAIN.auth0.com')
+auth0.requireAccount(ngx.var.service1_secret, ngx.var.service1_aud, 'https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
 ## Authentication Scheme
@@ -106,23 +118,16 @@ GET / HTTP/1.1
 Authorization: Bearer eyJra...
 ```
 
-These tokens are validated locally using the Auth0 API Key and Secret pair.
+These tokens are validated locally using the Auth0 client secret, account domain, and intended audience.
 
 ## Getting the Authenticated Account
 
-You can use the Auth0 plugin to check for an access token, and forward the account details to the end application. Here's what the configuration would look like.
+You can use the access token received by the Auth0 plugin and the get the authenticated account's details using the following:
 
-```nginx
-location /api/ {
-    access_by_lua_block {
-        local auth0 = require("auth0-nginx")
-        auth0.getAccount(os.getenv("API_KEY"), os.getenv("API_AUD"))
-    }
-    proxy_pass http://localhost:3000/;
-}
+```http
+GET https://ACCOUNT_DOMAIN.auth0.com/userinfo
+Authorization: Bearer {ACCESS_TOKEN}
 ```
-
-In this example, nginx will proxy all requests to `http://localhost:3000/`.
 
 ## Requiring Authentication
 
@@ -150,7 +155,7 @@ Note: Since the default nginx `401 Unauthorized` page is a HTML page, this examp
 
 ## OAuth Token Endpoint
 
-Auth0's nginx plugin can also act as an OAuth 2.0 endpoint and issue Auth0 access and refresh tokens. The OAuth handler supports the `password` and `refresh` grant types.
+Auth0's nginx plugin can also act as an OAuth 2.0 endpoint and issue Auth0 access and refresh tokens. The OAuth handler supports the `client_credentials`, `password` and `refresh_token` grant types.
 
 Since this endpoint requires connectivity to Auth0, you need to configure nginx to use a DNS resolver, as well as a pem file with your trusted SSL certificates. Add this into your http configuration block:
 
@@ -173,10 +178,10 @@ location = /oauth/token {
 }
 ```
 
-The `oauthTokenEndpoint` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href :
+The `oauthTokenEndpoint` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
 
 ```nginx
-auth0.oauthTokenEndpoint('https://AUTH0_SUBDOMAIN.auth0.com')
+auth0.oauthTokenEndpoint('https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
 ## Using the OAuth token endpoint
@@ -221,7 +226,7 @@ HTTP/1.1 400 Bad Request
 }
 ```
 
-Note: You can request a `refresh_token` by enabling the ability to work offline from Auth0 and adding the `offline_access` scope to your request
+Note: You can request a `refresh_token` by enabling the ability to work offline from Auth0 and adding the `offline_access` scope to your request.
 
 ### Refresh Grant Type
 
@@ -229,6 +234,7 @@ After the access token expires, you might want to get a new one. If your refresh
 
 ```http
 POST /oauth/token
+Content-Type: application/json
 
 {
   "grant_type":"refresh_token",
@@ -238,10 +244,11 @@ POST /oauth/token
 
 ### Client Credentials
 
-The OAuth token endpoint also supports the client credentials grant type, which is used to exchange a set of API Keys for an access token. The following request is made, using Basic Authentication with the API Key ID as the username, and API Key Secret as the password:
+The OAuth token endpoint also supports the client credentials grant type, which is used to exchange a set of API Keys for an access token:
 
 ```http
 POST /oauth/token
+Content-Type: application/json
 
 {
   "grant_type":"client_credentials",
@@ -258,6 +265,99 @@ This results in the following access token response (or above error response). N
   "expires_in": 3600,
   "token_type": "Bearer"
 }
+```
+
+## Signup Endpoint
+
+Auth0's nginx plugin can also act as a Signup endpoint.
+
+Since this endpoint requires connectivity to Auth0, you need to configure nginx to use a DNS resolver, as well as a pem file with your trusted SSL certificates, see the OAuth Token Endpoint docs above.
+
+Once you have nginx configured, you can add an OAuth endpoint with the following configuration:
+
+```nginx
+location = /signup {
+    content_by_lua_block {
+        local auth0 = require('auth0-nginx')
+        auth0.signup()
+    }
+}
+```
+
+Like with the OAuth Token endpoint, the `signup` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+
+```nginx
+auth0.signup('https://ACCOUNT_DOMAIN.auth0.com')
+```
+
+### Using the Signup Endpoint
+
+You can allow sign up with the following HTTP requests:
+
+```http
+POST /signup
+Content-Type: application/json
+
+{
+  "email":<email>,
+  "password":<password>
+}
+```
+
+This will respond with the following (or above error response):
+
+```http
+HTTP/1.1 200 OK
+
+{
+  "_id":"58457fe6b27...",
+  "email_verified":false,
+  "email":<email>
+}
+```
+
+## Change Password Endpoint
+
+Auth0's nginx plugin can also act as a Change Password endpoint.
+
+Since this endpoint requires connectivity to Auth0, you need to configure nginx to use a DNS resolver, as well as a pem file with your trusted SSL certificates, see the OAuth Token Endpoint docs above.
+
+Once you have nginx configured, you can add an OAuth endpoint with the following configuration:
+
+```nginx
+location = /change_password {
+    content_by_lua_block {
+        local auth0 = require('auth0-nginx')
+        auth0.changePassword()
+    }
+}
+```
+
+Like with the OAuth Token or Signup endpoint, the `changePassword` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+
+```nginx
+auth0.changePassword('https://ACCOUNT_DOMAIN.auth0.com')
+```
+
+### Using the Change Password Endpoint
+
+You can allow password change requests with the following HTTP requests:
+
+```http
+POST /change_password
+Content-Type: application/json
+
+{
+  "email":<email>
+}
+```
+
+This will respond with the following (or above error response):
+
+```http
+HTTP/1.1 200 OK
+
+"We've just sent you an email to reset your password."
 ```
 
 # Tests
