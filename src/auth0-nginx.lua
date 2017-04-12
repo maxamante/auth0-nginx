@@ -6,6 +6,7 @@ local validators = require('resty.jwt-validators')
 local appHref = os.getenv('AUTH0_ACCOUNT_DOMAIN')
 local clientId = os.getenv('AUTH0_CLIENT_ID')
 local clientSecret = os.getenv('AUTH0_CLIENT_SECRET')
+local connection = os.getenv('AUTH0_CLIENT_CONNECTION')
 
 assert(clientId ~= nil, 'Environment variable AUTH0_CLIENT_ID not set')
 assert(clientSecret ~= nil, 'Environment variable AUTH0_CLIENT_SECRET not set')
@@ -13,15 +14,17 @@ assert(clientSecret ~= nil, 'Environment variable AUTH0_CLIENT_SECRET not set')
 local M = {}
 local Helpers = {}
 
-function M.getAccount(secret, aud)
-  getAccount(false, secret, aud)
+function M.getAccount(secret, aud, applicationHref)
+  applicationHref = applicationHref or appHref
+  getAccount(false, secret, aud, applicationHref)
 end
 
-function M.requireAccount(secret, aud)
-  getAccount(true, secret, aud)
+function M.requireAccount(secret, aud, applicationHref)
+  applicationHref = applicationHref or appHref
+  getAccount(true, secret, aud, applicationHref)
 end
 
-function getAccount(required, secret, audience)
+function getAccount(required, secret, audience, applicationHref)
   local jwtString = Helpers.getBearerToken()
 
   if not jwtString then
@@ -30,7 +33,7 @@ function getAccount(required, secret, audience)
 
   local claimSpec = {
     exp = validators.required(validators.opt_is_not_expired()),
-    iss = validators.required(validators.opt_equals(appHref)),
+    iss = validators.required(validators.opt_equals(applicationHref)),
     aud = validators.required(validators.opt_equals(audience)),
   }
 
@@ -41,6 +44,77 @@ function getAccount(required, secret, audience)
   end
 end
 
+function M.changePassword(applicationHref)
+  applicationHref = applicationHref or appHref
+  changePassword(applicationHref)
+end
+
+function changePassword(applicationHref)
+  local httpc = http.new()
+  ngx.req.read_body()
+
+  local headers = ngx.req.get_headers()
+  local body = cjson.decode(ngx.req.get_body_data())
+
+  -- Add clientId and connection
+
+  body['client_id'] = clientId
+  body['connection'] = connection
+
+  -- Build/make the request_method
+
+  local request = Helpers.buildRequest(headers, body)
+  local res, err = httpc:request_uri(applicationHref .. 'dbconnections/change_password', request)
+
+  if not res or res.status >= 500 then
+    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+
+  -- Finish the request
+
+  local response = cjson.decode(res.body)
+  Helpers.finish(res, response)
+end
+
+function M.signup(applicationHref)
+  applicationHref = applicationHref or appHref
+  signup(applicationHref)
+end
+
+function signup(applicationHref)
+  local httpc = http.new()
+  ngx.req.read_body()
+
+  local headers = ngx.req.get_headers()
+  local body = cjson.decode(ngx.req.get_body_data())
+
+  -- Add clientId and connection
+
+  body['client_id'] = clientId
+  body['connection'] = connection
+
+  -- Build/make the request
+
+  local request = Helpers.buildRequest(headers, body)
+  local res, err = httpc:request_uri(applicationHref .. 'dbconnections/signup', request)
+
+  if not res or res.status >= 500 then
+    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+
+  -- Parse the response
+
+  local names = {
+    "_id",
+    "email_verified",
+    "email"
+  }
+  local response = Helpers.parseResponse(res, names)
+
+  -- Finish the request
+
+  Helpers.finish(res, response)
+end
 
 function M.oauthTokenEndpoint(applicationHref)
   applicationHref = applicationHref or appHref
@@ -57,39 +131,53 @@ function oauthTokenEndpoint(applicationHref)
   -- Add clientId and clientSecret to non-client_credentials requests
 
   if body['grant_type'] ~= 'client_credentials' then
-      body['client_id'] = clientId
-      body['client_secret'] = clientSecret
+    body['client_id'] = clientId
+    body['client_secret'] = clientSecret
   end
 
-  local request = {
-    method = ngx.var.request_method,
-    body = cjson.encode(body),
-    headers = {
-      ['content-type'] = 'application/json',
-      accept = 'application/json'
-    }
-  }
+  -- Build/make the request
 
-  -- Make the request
-
+  local request = Helpers.buildRequest(headers, body)
   local res, err = httpc:request_uri(applicationHref .. 'oauth/token' , request)
 
   if not res or res.status >= 500 then
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
 
+  -- Parse the response
+
+  local names = {
+    "access_token",
+    "refresh_token",
+    "token_type",
+    "expires_in"
+  }
+  local response = Helpers.parseResponse(res, names)
+
+  -- Finish the request
+
+  Helpers.finish(res, response)
+end
+
+function Helpers.finish(res, response)
+  ngx.status = res.status
+  ngx.header.content_type = res.headers['Content-Type']
+  ngx.header.cache_control = 'no-store'
+  ngx.header.pragma = 'no-cache'
+  ngx.say(cjson.encode(response))
+  ngx.exit(ngx.HTTP_OK)
+end
+
+function Helpers.parseResponse(res, responseNames)
   local json = cjson.decode(res.body)
   local response = {}
 
-  -- Respond with a stripped token response or error
+  -- Parse out a stripped response or error
 
   if res.status == 200 then
-    response = {
-      access_token = json.access_token,
-      refresh_token = json.refresh_token,
-      token_type = json.token_type,
-      expires_in = json.expires_in
-    }
+    for k,v in pairs(responseNames) do
+      response[v] = json[v]
+    end
   else
     response = {
       error = json.error,
@@ -97,12 +185,18 @@ function oauthTokenEndpoint(applicationHref)
     }
   end
 
-  ngx.status = res.status
-  ngx.header.content_type = res.headers['Content-Type']
-  ngx.header.cache_control = 'no-store'
-  ngx.header.pragma = 'no-cache'
-  ngx.say(cjson.encode(response))
-  ngx.exit(ngx.HTTP_OK)
+  return response
+end
+
+function Helpers.buildRequest(headers, body)
+  return {
+    method = ngx.var.request_method,
+    body = cjson.encode(body),
+    headers = {
+      ['content-type'] = headers['content-type'],
+      accept = 'application/json'
+    }
+  }
 end
 
 function Helpers.exit(required)
