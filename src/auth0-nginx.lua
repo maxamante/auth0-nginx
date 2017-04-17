@@ -181,7 +181,8 @@ function Helpers.parseResponse(res, responseNames)
   else
     response = {
       error = json.error,
-      message = json.message
+      message = json.message,
+      description = json.description
     }
   end
 
