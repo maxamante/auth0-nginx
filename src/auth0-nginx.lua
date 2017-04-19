@@ -7,6 +7,7 @@ local appHref = os.getenv('AUTH0_ACCOUNT_DOMAIN')
 local clientId = os.getenv('AUTH0_CLIENT_ID')
 local clientSecret = os.getenv('AUTH0_CLIENT_SECRET')
 local connection = os.getenv('AUTH0_CLIENT_CONNECTION')
+local whitelistDomains = os.getenv('AUTH0_WHITELIST_DOMAINS')
 
 assert(clientId ~= nil, 'Environment variable AUTH0_CLIENT_ID not set')
 assert(clientSecret ~= nil, 'Environment variable AUTH0_CLIENT_SECRET not set')
@@ -82,6 +83,7 @@ function M.signup(applicationHref)
 end
 
 function signup(applicationHref)
+  local whitelist = Helpers.explode(',', whitelistDomains)
   local httpc = http.new()
   ngx.req.read_body()
 
@@ -92,6 +94,15 @@ function signup(applicationHref)
 
   body['client_id'] = clientId
   body['connection'] = connection
+
+  -- Validate email being registered
+
+  if whitelist then
+    local origin = body['email']:split('@')[2]
+    if whitelist[origin] == nil then
+      return ngx.exit(412)
+    end
+  end
 
   -- Build/make the request
 
@@ -238,12 +249,50 @@ function string:startsWith(partialString)
   return self:len() >= partialStringLength and self:sub(1, partialStringLength) == partialString
 end
 
+function string:split(sSeparator, nMax, bRegexp)
+   assert(sSeparator ~= '')
+   assert(nMax == nil or nMax >= 1)
+
+   local aRecord = {}
+
+   if self:len() > 0 then
+      local bPlain = not bRegexp
+      nMax = nMax or -1
+
+      local nField, nStart = 1, 1
+      local nFirst,nLast = self:find(sSeparator, nStart, bPlain)
+      while nFirst and nMax ~= 0 do
+         aRecord[nField] = self:sub(nStart, nFirst-1)
+         nField = nField+1
+         nStart = nLast+1
+         nFirst,nLast = self:find(sSeparator, nStart, bPlain)
+         nMax = nMax-1
+      end
+      aRecord[nField] = self:sub(nStart)
+   end
+
+   return aRecord
+end
+
 function Helpers.copy(headers)
   local result = {}
   for k,v in pairs(headers) do
     result[k] = v
   end
   return result
+end
+
+function Helpers.explode(div, str)
+    if (div == '') then return false end
+    if (str == nil) then return false end
+    local pos, arr = 0, {}
+    -- for each divider found
+    for st, sp in function() return string.find(str,div,pos,true) end do
+      arr[string.sub(str,pos,st-1)] = string.sub(str,pos,st-1)
+      pos = sp + 1 -- Jump past current divider
+    end
+    arr[string.sub(str,pos)] = string.sub(str,pos)
+    return arr
 end
 
 return M
