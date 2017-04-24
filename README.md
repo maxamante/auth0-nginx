@@ -290,7 +290,15 @@ Like with the OAuth Token endpoint, the `signup` method requires the environment
 auth0.signup('https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
-### Using the Signup Endpoint
+The Signup endpoint can be configured to restrict signups to specific domains. This feature is implicitly turned on by declaring and exposing the `AUTH0_WHITELIST_DOMAINS` environment variable. This should be a comma separated value of domains allowed to sign up:
+
+```shell
+export AUTH0_WHITELIST_DOMAINS=google.com,facebook.com,amazon.com
+```
+
+When this variable is set, nginx will check that the domain is whitelisted. If the domain is not part of the whitelist, execution will end and a HTTP 412 will be returned.
+
+### Using the Signup endpoint
 
 You can allow sign up with the following HTTP requests:
 
@@ -339,7 +347,7 @@ Like with the OAuth Token or Signup endpoint, the `changePassword` method requir
 auth0.changePassword('https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
-### Using the Change Password Endpoint
+### Using the Change Password endpoint
 
 You can allow password change requests with the following HTTP requests:
 
@@ -358,6 +366,113 @@ This will respond with the following (or above error response):
 HTTP/1.1 200 OK
 
 "We've just sent you an email to reset your password."
+```
+
+## Social Login Endpoint
+
+Auth0's nginx plugin can also act as a Social Login endpoint. Currently, only the `token` response type is only fully implemented.
+
+Since this endpoint requires connectivity to Auth0, you need to configure nginx to use a DNS resolver, as well as a pem file with your trusted SSL certificates, see the OAuth Token Endpoint docs above.
+
+Once you have nginx configured, you can add an OAuth endpoint with the following configuration:
+
+```nginx
+location = /social_login {
+    content_by_lua_block {
+        local auth0 = require('auth0-nginx')
+        auth0.socialLogin()
+    }
+}
+```
+
+This endpoint is a proxy to Auth0's `authorize` endpoint. Please refer to the [Social docs](https://auth0.com/docs/api/authentication#social) for more information.
+
+Like with the OAuth Token endpoint, the `socialLogin` method requires the enviroment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+
+```nginx
+auth0.socialLogin('https://ACCOUNT_DOMAIN.auth0.com')
+```
+
+### Using the Social Login endpoint
+
+You can allow social login by redirecting your users with the following HTTP request:
+
+```http
+GET /social_login?
+    response_type=token
+    &connection=<social login connection>
+    &additional-parameter=<additional parameters>
+    &redirect_uri=<URL to redirect to after login>
+    &state=<opaque string>
+```
+
+This will redirect your user to the social identity provider's permissions grant page.
+
+## Userinfo Endpoint
+
+Auth0's nginx plugin can also act as a Userinfo endpoint.
+
+Since this endpoint requires connectivity to Auth0, you need to configure nginx to use a DNS resolver, as well as a pem file with your trusted SSL certificates, see the OAuth Token Endpoint docs above.
+
+Once you have nginx configured, you can add an OAuth endpoint with the following configuration:
+
+```nginx
+location = /userinfo {
+    content_by_lua_block {
+        local auth0 = require('auth0-nginx')
+        auth0.userinfo()
+    }
+}
+```
+
+Like with the OAuth Token endpoint, the `signup` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+
+```nginx
+auth0.userinfo('https://ACCOUNT_DOMAIN.auth0.com')
+```
+
+Using this endpoint with the social login endpoint, you can restrict social login to specific domains. First, you have to make sure to set `AUTH0_WHITELIST_DOMAINS` to a comma separated value of allowed domains. Then, in your nginx.conf you would make the following call:
+
+```nginx
+auth0.userinfo('https://ACCOUNT_DOMAIN.auth0.com', true)
+```
+
+The second argument (checkDomain) is set to true which will cause nginx to check that the domain is whitelisted. If the domain isn't whitelisted it will end execution and return a HTTP 412.
+
+### Using the Userinfo endpoint
+
+You request userinfo with the following HTTP requests:
+
+```http
+GET /userinfo
+Authorization <Bearer token>
+```
+
+This will response with the following (or above error response):
+
+```http
+HTTP/1.1 200 OK
+
+{
+  "email_verified": false,
+  "email": "test.account@userinfo.com",
+  "clientID": "s000s000...",
+  "updated_at": "2016-12-05T15:15:40.545Z",
+  "name": "test.account@userinfo.com",
+  "picture": "https://s.gravatar.com/avatar/dummy.png",
+  "user_id": "auth0|00000...",
+  "nickname": "test.account",
+  "identities": [
+    {
+      "user_id": "00000...",
+      "provider": "auth0",
+      "connection": "User-Auth-Database",
+      "isSocial": false
+    }
+  ],
+  "created_at": "2016-12-05T11:16:59.640Z",
+  "sub": "auth0|00000..."
+}
 ```
 
 # Tests
