@@ -62,11 +62,10 @@ function changePassword(applicationHref)
   body['client_id'] = clientId
   body['connection'] = connection
 
-  -- Build/make the request_method
+  -- Build and send the request
 
   local request = Helpers.buildRequest(headers, body)
   local res, err = httpc:request_uri(applicationHref .. 'dbconnections/change_password', request)
-
   if not res or res.status >= 500 then
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
@@ -83,7 +82,6 @@ function M.signup(applicationHref)
 end
 
 function signup(applicationHref)
-  local whitelist = Helpers.explode(',', whitelistDomains)
   local httpc = http.new()
   ngx.req.read_body()
 
@@ -97,18 +95,13 @@ function signup(applicationHref)
 
   -- Validate email being registered
 
-  if whitelist then
-    local origin = body['email']:split('@')[2]
-    if whitelist[origin] == nil then
-      return ngx.exit(412)
-    end
-  end
+  local email = body['email']
+  Helpers.checkDomainWhitelist(email)
 
-  -- Build/make the request
+  -- Build and send the request
 
   local request = Helpers.buildRequest(headers, body)
   local res, err = httpc:request_uri(applicationHref .. 'dbconnections/signup', request)
-
   if not res or res.status >= 500 then
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
@@ -146,11 +139,10 @@ function oauthTokenEndpoint(applicationHref)
     body['client_secret'] = clientSecret
   end
 
-  -- Build/make the request
+  -- Build the request
 
   local request = Helpers.buildRequest(headers, body)
   local res, err = httpc:request_uri(applicationHref .. 'oauth/token' , request)
-
   if not res or res.status >= 500 then
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
@@ -170,6 +162,51 @@ function oauthTokenEndpoint(applicationHref)
   Helpers.finish(res, response)
 end
 
+function M.socialLogin(applicationHref)
+  applicationHref = applicationHref or appHref
+  socialLogin(applicationHref)
+end
+
+function socialLogin(applicationHref)
+  local httpc = http.new()
+  ngx.req.read_body()
+
+  -- Attach client_id; Redirect
+
+  local ep = applicationHref .. 'authorize?' .. ngx.var.args .. '&client_id=' .. clientId
+  return ngx.redirect(ep)
+end
+
+function M.userInfo(applicationHref, checkDomain)
+  applicationHref = applicationHref or appHref
+  userInfo(applicationHref, checkDomain)
+end
+
+function userInfo(applicationHref, checkDomain)
+  local httpc = http.new()
+  ngx.req.read_body()
+
+  local headers = ngx.req.get_headers()
+  local request = Helpers.buildRequest(headers)
+  local res, err = httpc:request_uri(applicationHref .. 'userinfo', request)
+  if not res or res.status >= 500 then
+    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+
+  -- Parse the response
+
+  local body = cjson.decode(res.body)
+  local email = body['email']
+  if checkDomain then
+    Helpers.checkDomainWhitelist(email)
+  end
+
+  -- Finish the request
+
+  local response = res.body
+  Helpers.finish(res, response)
+end
+
 function Helpers.finish(res, response)
   ngx.status = res.status
   ngx.header.content_type = res.headers['Content-Type']
@@ -177,6 +214,16 @@ function Helpers.finish(res, response)
   ngx.header.pragma = 'no-cache'
   ngx.say(cjson.encode(response))
   ngx.exit(ngx.HTTP_OK)
+end
+
+function Helpers.checkDomainWhitelist(email)
+  local whitelist = Helpers.explode(',', whitelistDomains)
+  if whitelist then
+    local origin = email:split('@')[2]
+    if whitelist[origin] == nil then
+      return ngx.exit(412)
+    end
+  end
 end
 
 function Helpers.parseResponse(res, responseNames)
@@ -200,15 +247,16 @@ function Helpers.parseResponse(res, responseNames)
   return response
 end
 
-function Helpers.buildRequest(headers, body)
-  return {
-    method = ngx.var.request_method,
-    body = cjson.encode(body),
-    headers = {
-      ['content-type'] = headers['content-type'],
-      accept = 'application/json'
-    }
+function Helpers.buildRequest(headers, body, method)
+  headers['accept'] = 'application/json'
+  local req = {
+    method = method or ngx.var.request_method,
+    headers = headers
   }
+  if body then
+    req['body'] = cjson.encode(body)
+  end
+  return req
 end
 
 function Helpers.exit(required)
@@ -272,14 +320,6 @@ function string:split(sSeparator, nMax, bRegexp)
    end
 
    return aRecord
-end
-
-function Helpers.copy(headers)
-  local result = {}
-  for k,v in pairs(headers) do
-    result[k] = v
-  end
-  return result
 end
 
 function Helpers.explode(div, str)
