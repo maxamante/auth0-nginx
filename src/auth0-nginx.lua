@@ -102,6 +102,7 @@ function signup(applicationHref)
 
   local request = Helpers.buildRequest(headers, body)
   local res, err = httpc:request_uri(applicationHref .. 'dbconnections/signup', request)
+
   if not res or res.status >= 500 then
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
@@ -248,11 +249,21 @@ function Helpers.parseResponse(res, responseNames)
 end
 
 function Helpers.buildRequest(headers, body, method)
-  headers['accept'] = 'application/json'
   local req = {
     method = method or ngx.var.request_method,
-    headers = headers
   }
+
+  if headers then
+    req['headers'] = {
+      ['Content-Type'] = headers['Content-Type'],
+      accept = 'application/json'
+    }
+
+    if headers['Authorization'] then
+      req['headers']['Authorization'] = headers['Authorization']
+    end
+  end
+
   if body then
     req['body'] = cjson.encode(body)
   end
