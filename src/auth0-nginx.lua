@@ -49,13 +49,9 @@ end
 
 function M.changePassword(applicationHref)
   applicationHref = applicationHref or appHref
-  changePassword(applicationHref)
-end
-
-function changePassword(applicationHref)
-  local httpc = http.new()
   ngx.req.read_body()
 
+  local httpc = http.new()
   local headers = ngx.req.get_headers()
   local body = cjson.decode(ngx.req.get_body_data())
 
@@ -80,13 +76,9 @@ end
 
 function M.signup(applicationHref)
   applicationHref = applicationHref or appHref
-  signup(applicationHref)
-end
-
-function signup(applicationHref)
-  local httpc = http.new()
   ngx.req.read_body()
 
+  local httpc = http.new()
   local headers = ngx.req.get_headers()
   local body = cjson.decode(ngx.req.get_body_data())
 
@@ -104,7 +96,6 @@ function signup(applicationHref)
 
   local request = Helpers.buildRequest(headers, body)
   local res, err = httpc:request_uri(applicationHref .. 'dbconnections/signup', request)
-
   if not res or res.status >= 500 then
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
@@ -125,13 +116,9 @@ end
 
 function M.oauthTokenEndpoint(applicationHref)
   applicationHref = applicationHref or appHref
-  oauthTokenEndpoint(applicationHref)
-end
-
-function oauthTokenEndpoint(applicationHref)
-  local httpc = http.new()
   ngx.req.read_body()
 
+  local httpc = http.new()
   local headers = ngx.req.get_headers()
   local body = cjson.decode(ngx.req.get_body_data())
 
@@ -167,10 +154,6 @@ end
 
 function M.socialLogin(applicationHref)
   applicationHref = applicationHref or appHref
-  socialLogin(applicationHref)
-end
-
-function socialLogin(applicationHref)
 
   -- Attach client_id; Redirect
 
@@ -180,10 +163,6 @@ end
 
 function M.userInfo(applicationHref, checkDomain)
   applicationHref = applicationHref or appHref
-  userInfo(applicationHref, checkDomain)
-end
-
-function userInfo(applicationHref, checkDomain)
   local httpc = http.new()
   ngx.req.read_body()
 
@@ -233,6 +212,7 @@ function Helpers.parseResponse(res, responseNames)
 
   -- Parse out a stripped response or error
 
+function userInfo(applicationHref, checkDomain)
   if res.status == 200 then
     for k,v in pairs(responseNames) do
       response[v] = json[v]
