@@ -212,7 +212,6 @@ function Helpers.parseResponse(res, responseNames)
 
   -- Parse out a stripped response or error
 
-function userInfo(applicationHref, checkDomain)
   if res.status == 200 then
     for k,v in pairs(responseNames) do
       response[v] = json[v]
