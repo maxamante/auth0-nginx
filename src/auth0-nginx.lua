@@ -32,14 +32,16 @@ function getAccount(required, secret, audience, applicationHref)
     return Helpers.exit(required)
   end
 
-  local claimSpec = {
-    exp = validators.required(validators.opt_is_not_expired()),
-    iss = validators.required(validators.opt_equals(applicationHref)),
-    aud = validators.required(validators.opt_equals(audience)),
-  }
+  local claimSpec = {}
+  if applicationHref and audience then
+    claimSpec = {
+      exp = validators.required(validators.opt_is_not_expired()),
+      iss = validators.required(validators.opt_equals(applicationHref)),
+      aud = validators.required(validators.opt_equals(audience)),
+    }
+  end
 
   local jwt = jwt:verify(secret, jwtString, claimSpec)
-
   if not (jwt.verified and jwt.header.alg == 'HS256') then
     return Helpers.exit(required)
   end
@@ -169,8 +171,6 @@ function M.socialLogin(applicationHref)
 end
 
 function socialLogin(applicationHref)
-  local httpc = http.new()
-  ngx.req.read_body()
 
   -- Attach client_id; Redirect
 
