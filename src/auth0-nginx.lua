@@ -163,9 +163,9 @@ end
 
 function M.userInfo(applicationHref, checkDomain)
   applicationHref = applicationHref or appHref
-  local httpc = http.new()
   ngx.req.read_body()
 
+  local httpc = http.new()
   local headers = ngx.req.get_headers()
   local request = Helpers.buildRequest(headers)
   local res, err = httpc:request_uri(applicationHref .. 'userinfo', request)
