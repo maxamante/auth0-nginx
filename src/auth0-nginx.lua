@@ -141,6 +141,7 @@ function M.oauthTokenEndpoint(applicationHref)
 
   local names = {
     "access_token",
+    "id_token",
     "refresh_token",
     "token_type",
     "expires_in"
