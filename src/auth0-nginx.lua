@@ -32,16 +32,14 @@ function getAccount(required, secret, audience, applicationHref)
     return Helpers.exit(required)
   end
 
-  local claimSpec = {}
-  if applicationHref and audience then
-    claimSpec = {
-      exp = validators.required(validators.opt_is_not_expired()),
-      iss = validators.required(validators.opt_equals(applicationHref)),
-      aud = validators.required(validators.opt_equals(audience)),
-    }
-  end
+  local claimSpec = {
+    exp = validators.required(validators.opt_is_not_expired()),
+    iss = validators.required(validators.opt_equals(applicationHref)),
+    aud = validators.required(validators.opt_equals(audience)),
+  }
 
   local jwt = jwt:verify(secret, jwtString, claimSpec)
+
   if not (jwt.verified and jwt.header.alg == 'HS256') then
     return Helpers.exit(required)
   end
@@ -49,9 +47,13 @@ end
 
 function M.changePassword(applicationHref)
   applicationHref = applicationHref or appHref
+  changePassword(applicationHref)
+end
+
+function changePassword(applicationHref)
+  local httpc = http.new()
   ngx.req.read_body()
 
-  local httpc = http.new()
   local headers = ngx.req.get_headers()
   local body = cjson.decode(ngx.req.get_body_data())
 
@@ -76,9 +78,13 @@ end
 
 function M.signup(applicationHref)
   applicationHref = applicationHref or appHref
+  signup(applicationHref)
+end
+
+function signup(applicationHref)
+  local httpc = http.new()
   ngx.req.read_body()
 
-  local httpc = http.new()
   local headers = ngx.req.get_headers()
   local body = cjson.decode(ngx.req.get_body_data())
 
@@ -96,6 +102,7 @@ function M.signup(applicationHref)
 
   local request = Helpers.buildRequest(headers, body)
   local res, err = httpc:request_uri(applicationHref .. 'dbconnections/signup', request)
+
   if not res or res.status >= 500 then
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
@@ -116,9 +123,13 @@ end
 
 function M.oauthTokenEndpoint(applicationHref)
   applicationHref = applicationHref or appHref
+  oauthTokenEndpoint(applicationHref)
+end
+
+function oauthTokenEndpoint(applicationHref)
+  local httpc = http.new()
   ngx.req.read_body()
 
-  local httpc = http.new()
   local headers = ngx.req.get_headers()
   local body = cjson.decode(ngx.req.get_body_data())
 
@@ -141,6 +152,7 @@ function M.oauthTokenEndpoint(applicationHref)
 
   local names = {
     "access_token",
+    "id_token",
     "refresh_token",
     "token_type",
     "expires_in"
@@ -154,6 +166,12 @@ end
 
 function M.socialLogin(applicationHref)
   applicationHref = applicationHref or appHref
+  socialLogin(applicationHref)
+end
+
+function socialLogin(applicationHref)
+  local httpc = http.new()
+  ngx.req.read_body()
 
   -- Attach client_id; Redirect
 
@@ -163,9 +181,13 @@ end
 
 function M.userInfo(applicationHref, checkDomain)
   applicationHref = applicationHref or appHref
+  userInfo(applicationHref, checkDomain)
+end
+
+function userInfo(applicationHref, checkDomain)
+  local httpc = http.new()
   ngx.req.read_body()
 
-  local httpc = http.new()
   local headers = ngx.req.get_headers()
   local request = Helpers.buildRequest(headers)
   local res, err = httpc:request_uri(applicationHref .. 'userinfo', request)
