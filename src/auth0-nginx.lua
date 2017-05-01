@@ -41,9 +41,15 @@ function getAccount(required, secret, audience, applicationHref)
     }
   end
 
-  local jwt = jwt:verify(secret, jwtString, claimSpec)
-  if not (jwt.verified and jwt.header.alg == 'HS256') then
+  local checkedJwt = jwt:verify(secret, jwtString, claimSpec)
+  if not (checkedJwt.verified and checkedJwt.header.alg == 'HS256') then
     return Helpers.exit(required)
+  end
+
+  local accountToken = Helpers.getAccountToken()
+  local account = jwt:load_jwt(accountToken).payload
+  if account then
+    ngx.req.set_header('x-auth0-account', cjson.encode(account))
   end
 end
 
@@ -114,6 +120,54 @@ function M.signup(applicationHref)
   Helpers.finish(res, response)
 end
 
+function M.socialOauthTokenEndpoint(verify, applicationHref)
+  applicationHref = applicationHref or appHref
+  ngx.req.read_body()
+
+  local httpc = http.new()
+  local headers = ngx.req.get_headers()
+  local body = cjson.decode(ngx.req.get_body_data())
+
+  -- Add clientId and clientSecret to non-client_credentials requests
+
+  body['client_id'] = clientId
+  body['client_secret'] = clientSecret
+
+  -- Build and send the token grant request
+
+  local request = Helpers.buildRequest(headers, body)
+  local res, err = httpc:request_uri(applicationHref .. 'oauth/token' , request)
+  if not res or res.status >= 500 then
+    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+
+  --Build and send the userinfo request
+
+  local authRes = cjson.decode(res.body)
+  local userinfoHeaders = {
+    Authorization = 'Bearer ' .. authRes['access_token']
+  }
+  local userinfoRequest = Helpers.buildRequest(userinfoHeaders)
+  local userinfoRes, userinfoErr = httpc:request_uri(applicationHref .. 'userinfo', userinfoRequest)
+  if not userinfoRes or userinfoRes.status >= 500 then
+    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+
+  if verify then
+    local userinfoBody = cjson.decode(userinfoRes.body)
+    local email = userinfoBody['email']
+    Helpers.checkDomainWhitelist(email)
+  end
+
+  -- Finish request; Send userinfo
+
+  local responseBody = {
+    auth = authRes,
+    user = userinfoBody
+  }
+  Helpers.finish(res, responseBody)
+end
+
 function M.oauthTokenEndpoint(applicationHref)
   applicationHref = applicationHref or appHref
   ngx.req.read_body()
@@ -158,35 +212,27 @@ function M.socialLogin(applicationHref)
 
   -- Attach client_id; Redirect
 
+  if not ngx.var.args then
+    ngx.exit(ngx.HTTP_BAD_REQUEST)
+  end
+
   local ep = applicationHref .. 'authorize?' .. ngx.var.args .. '&client_id=' .. clientId
   return ngx.redirect(ep)
 end
 
-function M.userInfo(applicationHref, checkDomain)
+function M.verifyAccount(applicationHref)
   applicationHref = applicationHref or appHref
-  ngx.req.read_body()
 
-  local httpc = http.new()
-  local headers = ngx.req.get_headers()
-  local request = Helpers.buildRequest(headers)
-  local res, err = httpc:request_uri(applicationHref .. 'userinfo', request)
-  if not res or res.status >= 500 then
-    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
-  end
-
-  -- Parse the response
-
-  local body = cjson.decode(res.body)
-  local email = body['email']
-  if checkDomain then
+  local accountToken = Helpers.getAccountToken()
+  local account = jwt:load_jwt(accountToken).payload
+  if account then
+    local email = account['email']
     Helpers.checkDomainWhitelist(email)
+  else
+    return ngx.exit(ngx.HTTP_BAD_REQUEST)
   end
-
-  -- Finish the request
-
-  local response = res.body
-  Helpers.finish(res, response)
 end
+
 
 function Helpers.finish(res, response)
   ngx.status = res.status
@@ -268,6 +314,16 @@ function Helpers.getBearerToken()
   end
 end
 
+function Helpers.getAccountToken()
+  local accountTokenHeader = ngx.var.http_x_auth0_account_token
+
+  if not accountTokenHeader then
+    return nil
+  else
+    return accountTokenHeader
+  end
+end
+
 function Helpers.getBasicAuthCredentials()
   local authorizationHeader = ngx.var.http_authorization
 
@@ -281,6 +337,19 @@ function Helpers.getBasicAuthCredentials()
 
     return username, password
   end
+end
+
+function Helpers.explode(div, str)
+    if (div == '') then return false end
+    if (str == nil) then return false end
+    local pos, arr = 0, {}
+    -- for each divider found
+    for st, sp in function() return string.find(str,div,pos,true) end do
+      arr[string.sub(str,pos,st-1)] = string.sub(str,pos,st-1)
+      pos = sp + 1 -- Jump past current divider
+    end
+    arr[string.sub(str,pos)] = string.sub(str,pos)
+    return arr
 end
 
 function string:startsWith(partialString)
@@ -311,19 +380,6 @@ function string:split(sSeparator, nMax, bRegexp)
    end
 
    return aRecord
-end
-
-function Helpers.explode(div, str)
-    if (div == '') then return false end
-    if (str == nil) then return false end
-    local pos, arr = 0, {}
-    -- for each divider found
-    for st, sp in function() return string.find(str,div,pos,true) end do
-      arr[string.sub(str,pos,st-1)] = string.sub(str,pos,st-1)
-      pos = sp + 1 -- Jump past current divider
-    end
-    arr[string.sub(str,pos)] = string.sub(str,pos)
-    return arr
 end
 
 return M
