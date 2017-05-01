@@ -128,7 +128,7 @@ function M.socialOauthTokenEndpoint(verify, applicationHref)
   local headers = ngx.req.get_headers()
   local body = cjson.decode(ngx.req.get_body_data())
 
-  -- Add clientId and clientSecret to non-client_credentials requests
+  -- Add clientId and clientSecret
 
   body['client_id'] = clientId
   body['client_secret'] = clientSecret
@@ -153,13 +153,15 @@ function M.socialOauthTokenEndpoint(verify, applicationHref)
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
 
+  -- Verify email if enabled
+
   if verify then
     local userinfoBody = cjson.decode(userinfoRes.body)
     local email = userinfoBody['email']
     Helpers.checkDomainWhitelist(email)
   end
 
-  -- Finish request; Send userinfo
+  -- Finish request; Send auth and userinfo
 
   local responseBody = {
     auth = authRes,
