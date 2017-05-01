@@ -297,7 +297,7 @@ env API1_KEY;
                     aud = os.getenv('API1_AUD')
                 }
             }
-
+            
             local accessToken = jwt:sign(os.getenv('API1_KEY'), testJwtContents)
             ngx.req.set_header('Authorization', 'Bearer ' .. accessToken)
 
@@ -313,3 +313,60 @@ GET /t
 --- error_code: 200
 --- response_body_like
 Authorization: Bearer (.*)
+
+
+=== TEST 10: auth0.requireAccount passes headers on valid JWT
+--- main_config
+env AUTH0_CLIENT_ID;
+env AUTH0_CLIENT_SECRET;
+env AUTH0_ACCOUNT_DOMAIN;
+env API1_AUD;
+env API1_KEY;
+--- config
+    location = /t {
+        access_by_lua_block {
+            local jwt = require('resty.jwt')
+            local testJwtContents = {
+                header = {
+                    alg = 'HS256',
+                    typ = 'JWT'
+                },
+                payload = {
+                    iat = ngx.time() - 5,
+                    exp = ngx.time() + 3600,
+                    iss = os.getenv('AUTH0_ACCOUNT_DOMAIN'),
+                    aud = os.getenv('API1_AUD')
+                }
+            }
+            
+            local testIdContents = {
+                header = {
+                    alg = 'HS256',
+                    typ = 'JWT'
+                },
+                payload = {
+                    email = 'test.email@example.com',
+                    name = 'test.email@example.com',
+                    email_verified = false
+                }
+            }
+
+            local accessToken = jwt:sign(os.getenv('API1_KEY'), testJwtContents)
+            local idToken = jwt:sign(os.getenv('AUTH0_CLIENT_SECRET'), testIdContents)
+            ngx.req.set_header('Authorization', 'Bearer ' .. accessToken)
+            ngx.req.set_header('x-auth0-account-token', idToken)
+
+            local auth0 = require('auth0-nginx')
+            auth0.requireAccount(os.getenv('API1_KEY'), os.getenv('API1_AUD'))
+        }
+        content_by_lua_block {
+            ngx.say('Authorization: ' .. (ngx.var.http_authorization or ''))
+            ngx.say('X-Auth0-Account: ' .. (ngx.var.http_x_auth0_account or ''))
+        }
+    }
+--- request
+GET /t
+--- error_code: 200
+--- response_body_like
+Authorization: Bearer (.*)
+X-Auth0-Account: {(.*)}

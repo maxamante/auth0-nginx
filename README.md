@@ -18,7 +18,7 @@ location /api/ {
 }
 ```
 
-When a user makes a request to `/api/*`, Auth0 will look for and validate an access token for the request. If no access token is found or an access token with mismatching signature key and/or audience is found, Auth0 will ask nginx to render a `401 Unauthorized` page. For more information, please read through [this token verification documentation](https://auth0.com/docs/api-auth/tutorials/verify-access-token#check-the-signature-algorithm).
+When a user makes a request to `/api/*`, Auth0 will look for and validate an access token for the request. If no access token is found or an access token with mismatching signature key and/or audience is found, nginx will render a `401 Unauthorized` page. For more information, please read through [this token verification documentation](https://auth0.com/docs/api-auth/tutorials/verify-access-token#check-the-signature-algorithm).
 
 The Auth0 nginx integration also exposes an OAuth 2.0 endpoint that can issue access and refresh tokens for authenticated users, as well as signup and change password endpoints.
 
@@ -37,8 +37,8 @@ If you're new to OpenResty, the following tips will help you make sure you confi
 
 With Luarocks, you can install the Auth0 nginx plugin with:
 
-```bash
-$ luarocks install auth0-nginx --local
+```shell
+luarocks install auth0-nginx --local
 ```
 
 # Usage
@@ -51,11 +51,11 @@ The Auth0 plugin allows you to perform access control by adding code in the `acc
 
 As with any other Auth0 integration, the Auth0 nginx plugin reads environment variables to find the client key, secret, user database connection and domain for Auth0. Sign into your Auth0 admin console to find your client key, secret, user database connection and domain by running these and adding to your `.bash_profile`:
 
-```
+```shell
+export AUTH0_ACCOUNT_DOMAIN=
 export AUTH0_CLIENT_ID=
 export AUTH0_CLIENT_SECRET=
-export AUTH0_CLIENT_CONNECTION={Client's user database connection name}
-export AUTH0_ACCOUNT_DOMAIN={Account domain that most requests will go through}
+export AUTH0_CLIENT_CONNECTION=<User database connection name>
 ```
 
 With nginx, you need to explicitly expose environment variables to modules in the configuration, so you need to add into the top level configuration:
@@ -69,9 +69,9 @@ env AUTH0_ACCOUNT_DOMAIN;
 
 You also need to declare and expose a pair of key/audience values per endpoint that nginx will be providing authentication. E.g. If you have a `service1` endpoint:
 
-```
-export SERVICE1_AUD={Identifier found near the top of the API's Settings page}
-export SERVICE1_SECRET={Signing secret found near the bottom of the API's Settings page}
+```shell
+export SERVICE1_AUD=<Identifier near top of the Settings page of an API>
+export SERVICE1_SECRET=<Signing secret near the bottom of the Settings page of an API>
 ```
 
 Again expose them in the top level configuration of your nginx.conf file:
@@ -102,9 +102,9 @@ server {
 }
 ```
 
-The `getAccount` and `requireAccount` methods require the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+The `getAccount` and `requireAccount` methods require the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application URL:
 
-```nginx
+```lua
 auth0.getAccount(ngx.var.service1_secret, ngx.var.service1_aud, 'https://ACCOUNT_DOMAIN.auth0.com')
 auth0.requireAccount(ngx.var.service1_secret, ngx.var.service1_aud, 'https://ACCOUNT_DOMAIN.auth0.com')
 ```
@@ -122,16 +122,30 @@ These tokens are validated locally using the Auth0 client secret, account domain
 
 ## Getting the Authenticated Account
 
-You can use the access token received by the Auth0 plugin and the get the authenticated account's details using the following:
+It is recommended that you use the `openid` scope when requesting a user's `access_token`. Using this scope will return an `id_token` with your `access_token`. You can use the access and id tokens received by the Auth0 plugin and send a GET request to an endpoint using `getAccount` and `requireAccount` using the following headers:
 
 ```http
-GET https://ACCOUNT_DOMAIN.auth0.com/userinfo
-Authorization: Bearer {ACCESS_TOKEN}
+GET /getAccount HTTP/1.1
+Authorization: Bearer <ACCESS_TOKEN>
+X-Auth0-Account-Token: <ID_TOKEN>
+```
+
+The response will have the `X-Auth0-Account` header which will hold a stringified JSON object of the authenticated user's account information that will resemble the following:
+
+```json
+{
+  "name": "test.user@example.com",
+  "nickname": "test.user",
+  "picture": "https://s.gravatar.com/avatar/profile_photo.png",
+  "updated_at": "2016-04-20T16:20:00.420Z",
+  "email": "test.user@example.com",
+  "email_verified": false,
+}
 ```
 
 ## Requiring Authentication
 
-As a convenience, you can also have the Auth0 plugin only allow requests with a valid access token. In this example, Auth0 will deny requests with the default nginx `401 Unauthorized` handler.
+As a convenience, you can also have the Auth0 plugin only allow requests with a valid access token. In this example, Auth0 will deny requests with the default nginx `401 Unauthorized` handler. This method can also be used to get the authenticated user's account using the instructions above.
 
 ```nginx
 server {
@@ -153,7 +167,7 @@ server {
 
 Note: Since the default nginx `401 Unauthorized` page is a HTML page, this example shows how to override the default handler and instead return an empty body.
 
-## OAuth Token Endpoint
+## OAuth Token endpoint
 
 Auth0's nginx plugin can also act as an OAuth 2.0 endpoint and issue Auth0 access and refresh tokens. The OAuth handler supports the `client_credentials`, `password` and `refresh_token` grant types.
 
@@ -178,9 +192,9 @@ location = /oauth/token {
 }
 ```
 
-The `oauthTokenEndpoint` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+The `oauthTokenEndpoint` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application URL:
 
-```nginx
+```lua
 auth0.oauthTokenEndpoint('https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
@@ -197,9 +211,9 @@ POST /oauth/token
 Content-Type: application/json
 
 {
-  "grant_type":"password",
-  "username":<username>,
-  "password":<password>
+  "grant_type": "password",
+  "username": <username>,
+  "password": <password>
 }
 ```
 
@@ -209,9 +223,9 @@ This will respond with the following:
 HTTP/1.1 200 OK
 
 {
-  "access_token":"2YotnFZFEjr1zCsicMWpAA",
-  "expires_in":3600,
-  "token_type":"Bearer"
+  "access_token": "2kjdiJRNnd...",
+  "expires_in": 3600,
+  "token_type": "Bearer"
 }
 ```
 
@@ -237,8 +251,8 @@ POST /oauth/token
 Content-Type: application/json
 
 {
-  "grant_type":"refresh_token",
-  "refresh_token":<refresh token>
+  "grant_type": "refresh_token",
+  "refresh_token": <refresh_token>
 }
 ```
 
@@ -251,9 +265,9 @@ POST /oauth/token
 Content-Type: application/json
 
 {
-  "grant_type":"client_credentials",
-  "client_id":<client_id>,
-  "client_secret":<client_secret>
+  "grant_type": "client_credentials",
+  "client_id": <client_id>,
+  "client_secret": <client_secret>
 }
 ```
 
@@ -267,13 +281,13 @@ This results in the following access token response (or above error response). N
 }
 ```
 
-## Signup Endpoint
+## Signup endpoint
 
 Auth0's nginx plugin can also act as a Signup endpoint.
 
 Since this endpoint requires connectivity to Auth0, you need to configure nginx to use a DNS resolver, as well as a pem file with your trusted SSL certificates, see the OAuth Token Endpoint docs above.
 
-Once you have nginx configured, you can add an OAuth endpoint with the following configuration:
+Once you have nginx configured, you can add a Signup endpoint with the following configuration:
 
 ```nginx
 location = /signup {
@@ -284,9 +298,9 @@ location = /signup {
 }
 ```
 
-Like with the OAuth Token endpoint, the `signup` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+Like the OAuth Token endpoint, the `signup` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application URL:
 
-```nginx
+```lua
 auth0.signup('https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
@@ -307,8 +321,8 @@ POST /signup
 Content-Type: application/json
 
 {
-  "email":<email>,
-  "password":<password>
+  "email": <email>,
+  "password": <password>
 }
 ```
 
@@ -318,19 +332,19 @@ This will respond with the following (or above error response):
 HTTP/1.1 200 OK
 
 {
-  "_id":"58457fe6b27...",
-  "email_verified":false,
-  "email":<email>
+  "_id": "58457fe6b27...",
+  "email_verified": false,
+  "email": <email>
 }
 ```
 
-## Change Password Endpoint
+## Change Password endpoint
 
 Auth0's nginx plugin can also act as a Change Password endpoint.
 
 Since this endpoint requires connectivity to Auth0, you need to configure nginx to use a DNS resolver, as well as a pem file with your trusted SSL certificates, see the OAuth Token Endpoint docs above.
 
-Once you have nginx configured, you can add an OAuth endpoint with the following configuration:
+Once you have nginx configured, you can add a Change Password endpoint with the following configuration:
 
 ```nginx
 location = /change_password {
@@ -341,9 +355,9 @@ location = /change_password {
 }
 ```
 
-Like with the OAuth Token or Signup endpoint, the `changePassword` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+Like the OAuth Token or Signup endpoint, the `changePassword` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application URL:
 
-```nginx
+```lua
 auth0.changePassword('https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
@@ -356,7 +370,7 @@ POST /change_password
 Content-Type: application/json
 
 {
-  "email":<email>
+    "email": <email>
 }
 ```
 
@@ -368,13 +382,11 @@ HTTP/1.1 200 OK
 "We've just sent you an email to reset your password."
 ```
 
-## Social Login Endpoint
+## Social Login endpoint
 
-Auth0's nginx plugin can also act as a Social Login endpoint. Currently, only the `token` response type is only fully implemented.
+Auth0's nginx plugin can also act as a Social Login endpoint. In combination with the Social OAuth Token endpoint, you can use both `response_type`s allowed by Auth0.
 
-Since this endpoint requires connectivity to Auth0, you need to configure nginx to use a DNS resolver, as well as a pem file with your trusted SSL certificates, see the OAuth Token Endpoint docs above.
-
-Once you have nginx configured, you can add an OAuth endpoint with the following configuration:
+Once you have nginx configured, you can use the endpoint with the following configuration:
 
 ```nginx
 location = /social_login {
@@ -385,11 +397,11 @@ location = /social_login {
 }
 ```
 
-This endpoint is a proxy to Auth0's `authorize` endpoint. Please refer to the [Social docs](https://auth0.com/docs/api/authentication#social) for more information.
+This endpoint is a proxy to Auth0's `authorize` endpoint. Please refer to the [Auth0's Social documentation](https://auth0.com/docs/api/authentication#social) for more information.
 
-Like with the OAuth Token endpoint, the `socialLogin` method requires the enviroment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+Like with the OAuth Token endpoint, the `socialLogin` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
 
-```nginx
+```lua
 auth0.socialLogin('https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
@@ -399,7 +411,7 @@ You can allow social login by redirecting your users with the following HTTP req
 
 ```http
 GET /social_login?
-    response_type=token
+    response_type=<code|token>
     &connection=<social login connection>
     &additional-parameter=<additional parameters>
     &redirect_uri=<URL to redirect to after login>
@@ -408,70 +420,106 @@ GET /social_login?
 
 This will redirect your user to the social identity provider's permissions grant page.
 
-## Userinfo Endpoint
+## Social OAuth Token endpoint
 
-Auth0's nginx plugin can also act as a Userinfo endpoint.
+Auth0's nginx plugin can also act as the server-side in an `authorization_code` grant. Currently, this is implemented to work with the Social Login endpoint and is not tested for other `authorization_code` grant flows, but may still work as expected.
 
-Since this endpoint requires connectivity to Auth0, you need to configure nginx to use a DNS resolver, as well as a pem file with your trusted SSL certificates, see the OAuth Token Endpoint docs above.
-
-Once you have nginx configured, you can add an OAuth endpoint with the following configuration:
+Once you have nginx configured, you can use the endpoint with the following configuration:
 
 ```nginx
-location = /userinfo {
+location = /oauth/social_token {
     content_by_lua_block {
         local auth0 = require('auth0-nginx')
-        auth0.userinfo()
+        auth0.socialOauthTokenEndpoint()
     }
 }
 ```
 
-Like with the OAuth Token endpoint, the `signup` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+If you want to restrict login with a social account to the domains declared in `AUTH0_WHITELIST_DOMAINS`, you can enabling this with the following (this is disabled by default):
 
-```nginx
-auth0.userinfo('https://ACCOUNT_DOMAIN.auth0.com')
+```lua
+auth0.socialOauthTokenEndpoint(true)
 ```
 
-Using this endpoint with the social login endpoint, you can restrict social login to specific domains. First, you have to make sure to set `AUTH0_WHITELIST_DOMAINS` to a comma separated value of allowed domains. Then, in your nginx.conf you would make the following call:
+Additionally, like the OAuth Token endpoint, the `socialOauthTokenEndpoint` method requires the enviroment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application URL:
 
-```nginx
-auth0.userinfo('https://ACCOUNT_DOMAIN.auth0.com', true)
+```lua
+auth0.socialOauthTokenEndpoint(<true|false>, 'https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
-The second argument (checkDomain) is set to true which will cause nginx to check that the domain is whitelisted. If the domain isn't whitelisted it will end execution and return a HTTP 412.
+### Using the Social OAuth Token endpoint
 
-### Using the Userinfo endpoint
-
-You request userinfo with the following HTTP requests:
+You can continue an `authorization_code` grant flow with the following HTTP request:
 
 ```http
-GET /userinfo
-Authorization <Bearer token>
+POST /oauth/social_token
+
+{
+    "grant_type": "authorization_code",
+    "code": <authorization_code>,
+    "redirect_uri": <Redirection on success>
+}
 ```
 
-This will response with the following (or above error response):
+This will respond with the following (or above error response):
 
 ```http
 HTTP/1.1 200 OK
 
 {
-  "email_verified": false,
-  "email": "test.account@userinfo.com",
-  "clientID": "s000s000...",
-  "updated_at": "2016-12-05T15:15:40.545Z",
-  "name": "test.account@userinfo.com",
-  "picture": "https://s.gravatar.com/avatar/dummy.png",
-  "user_id": "auth0|00000...",
-  "nickname": "test.account",
-  "identities": [
-    {
-      "user_id": "00000...",
-      "provider": "auth0",
-      "connection": "User-Auth-Database",
-      "isSocial": false
+    "auth": {
+        "access_token": "23krwj...",
+        ...
+    },
+    "user": {
+        "email": "test.email@example.com",
+        ...
     }
-  ],
-  "created_at": "2016-12-05T11:16:59.640Z",
-  "sub": "auth0|00000..."
+}
+```
+
+In the response, `auth` will hold a JSON object similar to one issued by the `oauthTokenEndpoint` and `user` will hold a JSON object similar to one issued by the `getAccount`/`requireAccount` methods.
+
+## Verify Account endpoint
+
+Auth0's nginx plugin can also act as an account verifier; verifying that the account is part of the whitelisted domains.
+
+Once you have nginx configured, you can use the endpoint with the following configuration:
+
+```nginx
+location = /verify {
+    content_by_lua_block {
+        local auth0 = require('auth0-nginx')
+        auth0.verifyAccount()
+    }
+}
+```
+
+Like the OAuth Token endpoint, the `verifyAccount` method requires the enviroment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application href:
+
+```lua
+auth0.verifyAccount('https://ACCOUNT_DOMAIN.auth0.com')
+```
+
+### Using the Verify Account endpoint
+
+You can allow account verification with the following HTTP request:
+
+```http
+GET /verify
+Authorization: <Bearer Token>
+X-Auth0-Account-Token: <ID Token>
+```
+
+This will respond with the user's account (parsed from the ID Token) if the domain is whitelisted similar to the following response (or with an HTTP 412 if the domain is not allowed):
+
+```http
+HTTP/1.1 200 OK
+
+{
+    "email": "test.email@example.com",
+    "name": "test.email@example.com",
+    "email_verified": false
 }
 ```
 
