@@ -27,18 +27,20 @@ end
 
 function getAccount(required, secret, audience, applicationHref)
   local jwtString = Helpers.getBearerToken()
+  local auth = jwt:load_jwt(jwtString)
 
-  if not jwtString then
+  if not jwtString or not auth.valid then
     return Helpers.exit(required)
   end
 
-  local claimSpec = {}
-  if applicationHref and audience then
-    claimSpec = {
-      exp = validators.required(validators.opt_is_not_expired()),
-      iss = validators.required(validators.opt_equals(applicationHref)),
-      aud = validators.required(validators.opt_equals(audience)),
-    }
+  local claimSpec = {
+    exp = validators.required(validators.opt_is_not_expired()),
+    iss = validators.required(validators.opt_equals(applicationHref)),
+    aud = validators.required(validators.opt_equals(audience))
+  }
+  if type(auth.payload.aud) == 'table' then
+    claimSpec.aud = validators.required(
+      validators.opt_check(audience, Helpers.checkAud, 'check_aud', 'table'))
   end
 
   local checkedJwt = jwt:verify(secret, jwtString, claimSpec)
@@ -243,6 +245,13 @@ function Helpers.finish(res, response)
   ngx.header.pragma = 'no-cache'
   ngx.say(cjson.encode(response))
   ngx.exit(ngx.HTTP_OK)
+end
+
+function Helpers.checkAud(val, check_val)
+  for k,v in pairs(val) do
+    if v == check_val then return true end
+  end
+  return false
 end
 
 function Helpers.checkDomainWhitelist(email)
