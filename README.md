@@ -126,8 +126,8 @@ It is recommended that you use the `openid` scope when requesting a user's `acce
 
 ```http
 GET /getAccount HTTP/1.1
-Authorization: Bearer {ACCESS_TOKEN}
-X-Auth0-Account-Token: {ID_TOKEN}
+Authorization: Bearer <ACCESS_TOKEN>
+X-Auth0-Account-Token: <ID_TOKEN>
 ```
 
 The response will have the `X-Auth0-Account` header which will hold a stringified JSON object of the authenticated user's account information that will resemble the following:
