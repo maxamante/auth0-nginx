@@ -157,8 +157,8 @@ function M.socialOauthTokenEndpoint(verify, applicationHref)
 
   -- Verify email if enabled
 
+  local userinfoBody = cjson.decode(userinfoRes.body)
   if verify then
-    local userinfoBody = cjson.decode(userinfoRes.body)
     local email = userinfoBody['email']
     Helpers.checkDomainWhitelist(email)
   end
