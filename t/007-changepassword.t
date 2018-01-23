@@ -58,7 +58,6 @@ POST /t
 
 
 === TEST 3: auth0.changePassword happy path
---- ONLY
 --- main_config
 env AUTH0_CLIENT_ID;
 env AUTH0_CLIENT_SECRET;
