@@ -256,19 +256,6 @@ env AUTH0_MGMT_AUDIENCE;
         }
     }
 
-    location = /mock/api/v2/users/1234567890 {
-        content_by_lua_block {
-            local cjson = require('cjson')
-            ngx.header.content_type = 'application/json'
-            ngx.say(cjson.encode({
-                email = 'test-user@example.com',
-                user = 'test-user',
-                otherkey = 'test-otherkey'
-            }))
-            ngx.exit(200)
-        }
-    }
-
     location = /t {
         content_by_lua_block {
             local auth0 = require('auth0-nginx')
@@ -285,5 +272,5 @@ POST /t
     "password": "test-pass"
 }
 --- response_body
-{"user":{"user":"test-user","email":"test-user@example.com","otherkey":"test-otherkey"},"auth":{"id_token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImp0aSI6ImJjY2MwZWRmLThhOWUtNGVlZC1iOGY1LWMxZDE1ZTc5ZTFhZSIsImlhdCI6MTUxNjgyMjk0OSwiZXhwIjoxNTE2ODI2NTQ5fQ.trOwscmTZStE8R8ZZvVF1jY7teD4Eyda9yRDRm13s8I","access_token":"test-access-token"}}
+{"user":{"exp":1516826549,"admin":true,"iat":1516822949,"jti":"bccc0edf-8a9e-4eed-b8f5-c1d15e79e1ae","name":"John Doe","sub":"1234567890"},"auth":{"id_token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImp0aSI6ImJjY2MwZWRmLThhOWUtNGVlZC1iOGY1LWMxZDE1ZTc5ZTFhZSIsImlhdCI6MTUxNjgyMjk0OSwiZXhwIjoxNTE2ODI2NTQ5fQ.trOwscmTZStE8R8ZZvVF1jY7teD4Eyda9yRDRm13s8I","access_token":"test-access-token"}}
 --- error_code: 200
