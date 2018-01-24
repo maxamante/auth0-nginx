@@ -192,10 +192,18 @@ location = /oauth/token {
 }
 ```
 
+If you want to include the user's extended account in the response, you can enable this with the following (this is disabled by default):
+
+```lua
+auth0.oauthTokenEndpoint(true)
+```
+
+Note: Returning the user's extended account is only supported through the Password Grant type.
+
 The `oauthTokenEndpoint` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application URL:
 
 ```lua
-auth0.oauthTokenEndpoint('https://ACCOUNT_DOMAIN.auth0.com')
+auth0.oauthTokenEndpoint(<true|false>, 'https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
 ## Using the OAuth token endpoint
@@ -237,6 +245,23 @@ HTTP/1.1 400 Bad Request
 {
   "error": "invalid_grant",
   "message": "Invalid username or password."
+}
+```
+
+If you're including the user's extended account, the response will have this form:
+
+```http
+HTTP/1.1 200 OK
+
+{
+    "auth": {
+        "access_token": "23krwj...",
+        ...
+    },
+    "user": {
+        "email": "test.email@example.com",
+        ...
+    }
 }
 ```
 
@@ -435,16 +460,22 @@ location = /oauth/social_token {
 }
 ```
 
-If you want to restrict login with a social account to the domains declared in `AUTH0_WHITELIST_DOMAINS`, you can enabling this with the following (this is disabled by default):
+If you want to restrict login with a social account to the domains declared in `AUTH0_WHITELIST_DOMAINS`, you can enable this with the following (this is disabled by default):
 
 ```lua
 auth0.socialOauthTokenEndpoint(true)
 ```
 
+If you want to include the user's extended account in the response, you can enable this with the following (this is disabled by default):
+
+```lua
+auth0.socialOauthTokenEndpoint(<true|false>, true)
+```
+
 Additionally, like the OAuth Token endpoint, the `socialOauthTokenEndpoint` method requires the enviroment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application URL:
 
 ```lua
-auth0.socialOauthTokenEndpoint(<true|false>, 'https://ACCOUNT_DOMAIN.auth0.com')
+auth0.socialOauthTokenEndpoint(<true|false>, <true|false>, 'https://ACCOUNT_DOMAIN.auth0.com')
 ```
 
 ### Using the Social OAuth Token endpoint
@@ -462,6 +493,18 @@ POST /oauth/social_token
 ```
 
 This will respond with the following (or above error response):
+
+```http
+HTTP/1.1 200 OK
+
+{
+  "access_token": "2kjdiJRNnd...",
+  "expires_in": 3600,
+  "token_type": "Bearer"
+}
+```
+
+If you're including the user's extended account, the response will have the following form:
 
 ```http
 HTTP/1.1 200 OK
