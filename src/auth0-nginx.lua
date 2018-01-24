@@ -207,20 +207,14 @@ function M.oauthTokenEndpoint(includeUser, applicationHref)
   local responseBody = authRes
   if includeUser and body['grant_type'] == 'password' then
     --Build and send the userinfo request
+    local idToken = authRes['id_token']
+    local acct = jwt:load_jwt(idToken).payload
 
-    local userinfoHeaders = {
-      Authorization = 'Bearer ' .. authRes['access_token']
-    }
-    local userinfoRequest = Helpers.buildRequest(userinfoHeaders)
-    local userinfoRes, userinfoErr = httpc:request_uri(applicationHref .. 'userinfo', userinfoRequest)
-    if not userinfoRes or userinfoRes.status >= 500 then
-      return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
-    end
-    local userinfoBody = cjson.decode(userinfoRes.body)
-
+    local mgmtToken = Helpers.requestMgmtAccessToken(applicationHref)['access_token']
+    local userMeta = Helpers.requestUserMetadata(mgmtToken, acct['sub'], applicationHref)
     responseBody = {
       auth = authRes,
-      user = userinfoBody
+      user = userMeta
     }
   end
   Helpers.finish(res, responseBody)
@@ -251,7 +245,6 @@ function M.verifyAccount(applicationHref)
     return ngx.exit(ngx.HTTP_BAD_REQUEST)
   end
 end
-
 
 function Helpers.finish(res, response)
   ngx.status = res.status
@@ -320,6 +313,45 @@ function Helpers.buildRequest(headers, body, method)
     req['body'] = cjson.encode(body)
   end
   return req
+end
+
+function Helpers.requestMgmtAccessToken(applicationHref)
+  applicationHref = applicationHref or appHref
+
+  local headers = {
+    ['Content-Type'] = 'application/json',
+  }
+  local body = {
+    audience = applicationHref .. 'api/v2/',
+    ['grant_type'] = 'client_credentials',
+    ['client_id'] = clientId,
+    ['client_secret'] = clientSecret
+  }
+  local request = Helpers.buildRequest(headers, body, 'POST')
+
+  local httpc = http.new()
+  local res, err = httpc:request_uri(applicationHref .. 'oauth/token', request)
+  if not res or res.status >= 500 then
+    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  return cjson.decode(res.body)
+end
+
+function Helpers.requestUserMetadata(mgmtToken, user, applicationHref)
+  applicationHref = applicationHref or appHref
+
+  local headers = {
+    ['Content-Type'] = 'application/json',
+    Authorization = 'Bearer ' .. mgmtToken
+  }
+  local request = Helpers.buildRequest(headers)
+
+  local httpc = http.new()
+  local res, err = httpc:request_uri(applicationHref .. 'api/v2/users/' .. user, request)
+  if not res or res.status >= 500 then
+    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  return cjson.decode(res.body)
 end
 
 function Helpers.exit(required)

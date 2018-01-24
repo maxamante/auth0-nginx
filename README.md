@@ -199,6 +199,8 @@ auth0.oauthTokenEndpoint(true)
 ```
 
 Note: Returning the user's extended account is only supported through the Password Grant type.
+Note: Returning the user's extended account requires reaching out to
+[Auth0's Management API](https://auth0.com/docs/api/management/v2).
 
 The `oauthTokenEndpoint` method requires the environment variable `AUTH0_ACCOUNT_DOMAIN` to be set and exposed as well. Alternatively, you can call the method and pass in an application URL:
 
