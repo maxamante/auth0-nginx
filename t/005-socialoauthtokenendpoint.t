@@ -12,7 +12,7 @@ env AUTH0_ACCOUNT_DOMAIN;
     location = /t {
         content_by_lua_block {
             local auth0 = require('auth0-nginx')
-            auth0.socialOauthTokenEndpoint(true, 'http://127.0.0.1:19232/mock/')
+            auth0.socialOauthTokenEndpoint(true, false, 'http://127.0.0.1:19232/mock/')
         }
     }
 --- more_headers
@@ -44,7 +44,7 @@ env AUTH0_ACCOUNT_DOMAIN;
     location = /t {
         content_by_lua_block {
             local auth0 = require('auth0-nginx')
-            auth0.socialOauthTokenEndpoint(true, 'http://127.0.0.1:1984/mock/')
+            auth0.socialOauthTokenEndpoint(true, false, 'http://127.0.0.1:1984/mock/')
         }
     }
 --- more_headers
@@ -76,7 +76,7 @@ env AUTH0_ACCOUNT_DOMAIN;
     location = /t {
         content_by_lua_block {
             local auth0 = require('auth0-nginx')
-            auth0.socialOauthTokenEndpoint(true, 'http://127.0.0.1:1984/mock/')
+            auth0.socialOauthTokenEndpoint(true, false, 'http://127.0.0.1:1984/mock/')
         }
     }
 --- more_headers
@@ -115,7 +115,7 @@ env AUTH0_ACCOUNT_DOMAIN;
     location = /t {
         content_by_lua_block {
             local auth0 = require('auth0-nginx')
-            auth0.socialOauthTokenEndpoint(true, 'http://127.0.0.1:1984/mock/')
+            auth0.socialOauthTokenEndpoint(true, false, 'http://127.0.0.1:1984/mock/')
         }
     }
 --- more_headers
