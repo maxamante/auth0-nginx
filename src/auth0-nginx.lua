@@ -212,17 +212,6 @@ function M.oauthTokenEndpoint(includeUser, applicationHref)
 
     local mgmtToken = Helpers.requestMgmtAccessToken(applicationHref)['access_token']
     local userMeta = Helpers.requestUserMetadata(mgmtToken, acct['sub'], applicationHref)
-
-    -- local userinfoHeaders = {
-    --   Authorization = 'Bearer ' .. authRes['access_token']
-    -- }
-    -- local userinfoRequest = Helpers.buildRequest(userinfoHeaders)
-    -- local userinfoRes, userinfoErr = httpc:request_uri(applicationHref .. 'userinfo', userinfoRequest)
-    -- if not userinfoRes or userinfoRes.status >= 500 then
-    --   return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
-    -- end
-    -- local userinfoBody = cjson.decode(userinfoRes.body)
-
     responseBody = {
       auth = authRes,
       user = userMeta

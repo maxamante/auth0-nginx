@@ -264,7 +264,8 @@ env AUTH0_MGMT_AUDIENCE;
             ngx.header.content_type = 'application/json'
             ngx.say(cjson.encode({
                 email = 'test-user@example.com',
-                user = 'test-user'
+                user = 'test-user',
+                otherkey = 'test-otherkey'
             }))
             ngx.exit(200)
         }
@@ -286,5 +287,5 @@ POST /t
     "password": "test-pass"
 }
 --- response_body
-{"user":{"user":"test-user","email":"test-user@example.com"},"auth":{"id_token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImp0aSI6ImJjY2MwZWRmLThhOWUtNGVlZC1iOGY1LWMxZDE1ZTc5ZTFhZSIsImlhdCI6MTUxNjgyMjk0OSwiZXhwIjoxNTE2ODI2NTQ5fQ.trOwscmTZStE8R8ZZvVF1jY7teD4Eyda9yRDRm13s8I","access_token":"test-access-token"}}
+{"user":{"user":"test-user","email":"test-user@example.com","otherkey":"test-otherkey"},"auth":{"id_token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImp0aSI6ImJjY2MwZWRmLThhOWUtNGVlZC1iOGY1LWMxZDE1ZTc5ZTFhZSIsImlhdCI6MTUxNjgyMjk0OSwiZXhwIjoxNTE2ODI2NTQ5fQ.trOwscmTZStE8R8ZZvVF1jY7teD4Eyda9yRDRm13s8I","access_token":"test-access-token"}}
 --- error_code: 200
