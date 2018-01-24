@@ -122,13 +122,15 @@ function M.signup(applicationHref)
   Helpers.finish(res, response)
 end
 
-function M.socialOauthTokenEndpoint(verify, applicationHref)
+function M.socialOauthTokenEndpoint(verify, includeUser, applicationHref)
   applicationHref = applicationHref or appHref
-  ngx.req.read_body()
+  includeUser = includeUser or false
+  verify = verify or false
 
-  local httpc = http.new()
-  local headers = ngx.req.get_headers()
+  ngx.req.read_body()
   local body = cjson.decode(ngx.req.get_body_data())
+  local headers = ngx.req.get_headers()
+  local httpc = http.new()
 
   -- Add clientId and clientSecret
 
@@ -165,10 +167,13 @@ function M.socialOauthTokenEndpoint(verify, applicationHref)
 
   -- Finish request; Send auth and userinfo
 
-  local responseBody = {
-    auth = authRes,
-    user = userinfoBody
-  }
+  local responseBody = authRes
+  if includeUser then
+    responseBody = {
+      auth = authRes,
+      user = userinfoBody
+    }
+  end
   Helpers.finish(res, responseBody)
 end
 
