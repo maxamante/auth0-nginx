@@ -78,7 +78,7 @@ function M.changePassword(applicationHref)
 
   -- Finish the request
 
-  local response = cjson.decode(res.body)
+  local response = res.body
   Helpers.finish(res, response)
 end
 
