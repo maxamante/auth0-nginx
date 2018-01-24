@@ -213,7 +213,6 @@ env AUTH0_MGMT_AUDIENCE;
 
             ngx.req.read_body()
             local body = cjson.decode(ngx.req.get_body_data())
-            ngx.log(ngx.DEBUG, cjson.encode(body))
             if (body['audience']) then
                 assert(body['client_id'])
                 assert(body['client_secret'])
@@ -226,7 +225,6 @@ env AUTH0_MGMT_AUDIENCE;
                 }))
                 ngx.exit(200)
             else
-                ngx.log(ngx.DEBUG, cjson.encode(body))
                 assert(body['client_id'])
                 assert(body['client_secret'])
                 assert(body['grant_type'] == 'password')
