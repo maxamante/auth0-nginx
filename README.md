@@ -460,13 +460,13 @@ location = /oauth/social_token {
 }
 ```
 
-If you want to restrict login with a social account to the domains declared in `AUTH0_WHITELIST_DOMAINS`, you can enabling this with the following (this is disabled by default):
+If you want to restrict login with a social account to the domains declared in `AUTH0_WHITELIST_DOMAINS`, you can enable this with the following (this is disabled by default):
 
 ```lua
 auth0.socialOauthTokenEndpoint(true)
 ```
 
-If you want to include the user's extended account in the response, you can enabling this with the following (this is disabled by default):
+If you want to include the user's extended account in the response, you can enable this with the following (this is disabled by default):
 
 ```lua
 auth0.socialOauthTokenEndpoint(<true|false>, true)
